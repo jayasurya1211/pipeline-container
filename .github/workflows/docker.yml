@@ -1,0 +1,32 @@
+name: docker-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t weather-pipeline:ci .
+
+      - name: Run tests in container
+        run: docker run --rm weather-pipeline:ci python -m pytest -p no:cacheprovider
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push image
+        if: github.event_name == 'push'
+        run: |
+          docker tag weather-pipeline:ci ${{ secrets.DOCKERHUB_USERNAME }}/weather-pipeline:latest
+          docker tag weather-pipeline:ci ${{ secrets.DOCKERHUB_USERNAME }}/weather-pipeline:${{ github.sha }}
+          docker push --all-tags ${{ secrets.DOCKERHUB_USERNAME }}/weather-pipeline
